@@ -6,11 +6,21 @@ from gensim import corpora
 
 from langdetect import detect, DetectorFactory
 from stopwordsiso import stopwords, langs
+
 import nltk
 from nltk.tokenize import word_tokenize
-# Download NLTK data files (only the first time)
-# nltk.download('punkt')
+from nltk.collocations import BigramCollocationFinder, TrigramCollocationFinder
+from nltk.metrics import BigramAssocMeasures, TrigramAssocMeasures
+try:
+    nltk.data.find('punkt/english.pickle')
+except LookupError:
+    nltk.download('punkt')
+    nltk.download('punkt_tab')
 
+from lexical_diversity import lex_div as ld
+
+from collections import defaultdict
+from collections import Counter as pCounter
 import re
 
 # Complete mapping of ISO language codes to NLTK stopwords language names
@@ -332,25 +342,42 @@ def tokenize_text(text, lang):
     return tokens
 
 
+def find_n_collocations(df: pd.DataFrame, tokens_col: str, n: int =20, min_frequency: int = 3):
+    all_tokens = [token for tokens in df[tokens_col] for token in tokens]
+    # Bigram Collocation Finder
+    bigram_measures = BigramAssocMeasures()
+    finder = BigramCollocationFinder.from_words(all_tokens)
+    finder.apply_freq_filter(min_frequency)
+    bigram_collocations = finder.nbest(bigram_measures.pmi, n)
+    
+    print(f"\nTop {n} Bigram Collocations:")
+    for i, bigram in enumerate(bigram_collocations):
+        print(f"{i+1}.{' '.join(bigram)}")
+
+    # Trigram Collocation Finder
+    trigram_measures = TrigramAssocMeasures()
+    finder = TrigramCollocationFinder.from_words(all_tokens)
+    finder.apply_freq_filter(min_frequency)
+    trigram_collocations = finder.nbest(trigram_measures.pmi, n)
+    
+    print(f"\nTop {n} Trigram Collocations:")
+    for i, trigram in enumerate(trigram_collocations):
+        print(f"{i+1}.{' '.join(trigram)}")
+
+
+def build_cooccurrence_matrix(tokens_list, window_size=2):
+    cooccurrence = defaultdict(pCounter)
+    for tokens in tokens_list:
+        for i in range(len(tokens)):
+            token = tokens[i]
+            context = tokens[max(0, i - window_size): i] + tokens[i + 1: i + window_size + 1]
+            for context_word in context:
+                if token != context_word:
+                    cooccurrence[token][context_word] += 1
+    return cooccurrence
+  
+
 def extract_topics(df, text_column, num_topics=10, passes=5, tokens_already_processed=False, **kwargs):
-    """
-    Extract topics from a dataset using LDA topic modeling.
-
-    Parameters:
-    - df: pandas DataFrame containing the dataset.
-    - text_column: string, name of the column containing the text data.
-    - num_topics: int, number of topics to extract (default is 10).
-    - passes: int, number of passes through the corpus during training (default is 5).
-    - tokens_already_processed: bool, 
-        - True if text_column contains tokenized words as lists of strings.
-        - False if text_column contains raw text strings that need tokenization.
-    - **kwargs: additional keyword arguments to pass to gensim.models.LdaModel.
-
-    Returns:
-    - lda_model: trained LDA model.
-    - corpus: corpus used for the model.
-    - dictionary: gensim dictionary mapping of id to word.
-    """
     # If tokens are not already processed, tokenize the text data
     if not tokens_already_processed:
         df['processed_tokens'] = df[text_column].apply(lambda x: word_tokenize(x))
@@ -379,13 +406,6 @@ def extract_topics(df, text_column, num_topics=10, passes=5, tokens_already_proc
 
 
 def assign_dominant_topic(lda_model, corpus):
-    """
-    Assigns the dominant topic to each document in the corpus.
-    
-    Returns:
-    - A list of dominant topic indices for each document.
-    - A list of topic contribution percentages for each document.
-    """
     dominant_topics = []
     topic_percentages = []
     
@@ -400,3 +420,16 @@ def assign_dominant_topic(lda_model, corpus):
         topic_percentages.append(dominant_prob)
     
     return dominant_topics, topic_percentages
+
+
+def calculate_cttr(tokens):
+    num_tokens = len(tokens)
+    num_types = len(set(tokens))
+    cttr = num_types / (num_tokens ** 0.5) if num_tokens > 0 else 0
+    return cttr
+
+
+def get_mtld(all_tokens: list):
+  mtld = ld.mtld(all_tokens)
+  return mtld
+  

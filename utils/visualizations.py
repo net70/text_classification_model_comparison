@@ -1,12 +1,14 @@
 import pandas as pd
 import numpy as np
 import seaborn as sns
+import matplotlib
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import plotly.express as px
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 from wordcloud import WordCloud
+import networkx as nx
 
 import nltk
 from nltk import ngrams
@@ -334,7 +336,37 @@ def viz_tsne_3d_clusetrs_by_class(df: pd.DataFrame, vector_col: str, target_col:
     )
     
     fig.show()
+      
+def visualize_cooccurrence(cooccurrence_matrix, top_n=50, ax=None, title='', background_color='white'):
+    if ax is None:
+        ax = plt.gca()
 
+    # Create a background image
+    bg_array = np.full((10, 10, 3), matplotlib.colors.to_rgb(background_color))
+    ax.imshow(bg_array, extent=[-1.1, 1.1, -1.1, 1.1], aspect='auto')
 
-    
-    
+    # Build the graph
+    G = nx.Graph()
+    # Flatten co-occurrence into edge list
+    edges = []
+    for word, counts in cooccurrence_matrix.items():
+        for context_word, count in counts.items():
+            edges.append((word, context_word, count))
+    # Sort edges by weight (count)
+    edges = sorted(edges, key=lambda x: x[2], reverse=True)[:top_n]
+    # Add weighted edges to the graph
+    G.add_weighted_edges_from(edges)
+
+    # Draw graph
+    pos = nx.spring_layout(G, k=0.5, iterations=50)
+    nx.draw_networkx_nodes(G, pos, node_size=100, node_color='skyblue', ax=ax)
+    nx.draw_networkx_edges(G, pos, alpha=0.5, edge_color='gray', ax=ax)
+    nx.draw_networkx_labels(G, pos, font_size=8, ax=ax)
+    ax.set_title(title, fontsize=12)
+    # Remove ticks and spines
+    ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+    # Set limits
+    ax.set_xlim(-1.1, 1.1)
+    ax.set_ylim(-1.1, 1.1)

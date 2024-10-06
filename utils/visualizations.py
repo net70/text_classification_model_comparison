@@ -370,3 +370,80 @@ def visualize_cooccurrence(cooccurrence_matrix, top_n=50, ax=None, title='', bac
     # Set limits
     ax.set_xlim(-1.1, 1.1)
     ax.set_ylim(-1.1, 1.1)
+
+
+def visualize_pos_frequencies(df: pd.DataFrame, pos_col: str, calsses_col: str, class_label: str = None, ax=None):
+    if class_label:
+        df_filtered = df[df[calsses_col] == class_label]
+        title = f'POS Tag Frequency in {class_label.capitalize()} Inquiries'
+    else:
+        df_filtered = df
+        title = 'Overall POS Tag Frequency'
+
+    all_tags = [tag for tags in df_filtered[pos_col] for tag in tags]
+    pos_counts = Counter(all_tags)
+
+    pos_df = pd.DataFrame(pos_counts.items(), columns=['POS Tag', 'Count'])
+    pos_df = pos_df.sort_values(by='Count', ascending=False)
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(10, 6))
+
+    sns.barplot(y='POS Tag', x='Count', data=pos_df, palette='viridis', ax=ax)
+    ax.set_title(title)
+    ax.set_xlabel('Count')
+    ax.set_ylabel('POS Tag')
+    ax.tick_params(axis='y', labelsize=10)
+
+    # Add data labels to each bar
+    for p in ax.patches:
+        count = p.get_width()
+        y = p.get_y() + p.get_height() / 2
+        ax.text(count + max(pos_df['Count']) * 0.01, y, int(count), va='center')
+
+
+def visualize_top_n_ner_entities(df: pd.DataFrame, entities_col: str, classes_col: str, class_label: str = None, top_n: int = 10, ax=None):
+    if class_label:
+        entities_list = df[df[classes_col] == class_label][entities_col]
+        title = f'Top {top_n} Entities in {class_label} Inquiries'
+    else:
+        entities_list = df[entities_col]
+        title = f'Top {top_n} Entities'
+    
+    # Aggregate entities
+    all_entities = []
+    for entities in entities_list:
+        all_entities.extend(entities)
+
+    cls_label = class_label if class_label else 'the dataset'
+    
+    if not all_entities:
+        print(f"No entities found for {cls_label}.")
+        return
+    
+    entities_df = pd.DataFrame(all_entities)
+    
+    if entities_df.empty:
+        print(f"No entities to display for {cls_label}.")
+        return
+    
+    # Count entity texts
+    entity_text_counts = entities_df['text'].value_counts().nlargest(top_n).reset_index()
+    entity_text_counts.columns = ['Entity', 'Count']
+    entity_text_counts = entity_text_counts.sort_values(by='Count', ascending=False)
+
+    # Plot
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(10, 6))
+
+    sns.barplot(y='Entity', x='Count', data=entity_text_counts, palette='coolwarm', ax=ax)
+    ax.set_title(title)
+    ax.set_xlabel('Count')
+    ax.set_ylabel('Entity')
+    ax.tick_params(axis='y', labelsize=10)
+
+    # Add data labels to each bar
+    for p in ax.patches:
+        count = p.get_width()
+        y = p.get_y() + p.get_height() / 2
+        ax.text(count + max(entity_text_counts['Count']) * 0.01, y, int(count), va='center')

@@ -6,9 +6,10 @@ from gensim import corpora
 
 from langdetect import detect, DetectorFactory
 from stopwordsiso import stopwords, langs
-
+import stanza
 import nltk
 from nltk.tokenize import word_tokenize
+from nltk import pos_tag
 from nltk.collocations import BigramCollocationFinder, TrigramCollocationFinder
 from nltk.metrics import BigramAssocMeasures, TrigramAssocMeasures
 try:
@@ -18,6 +19,8 @@ except LookupError:
     nltk.download('punkt_tab')
 
 from lexical_diversity import lex_div as ld
+
+import torch
 
 from collections import defaultdict
 from collections import Counter as pCounter
@@ -432,4 +435,53 @@ def calculate_cttr(tokens):
 def get_mtld(all_tokens: list):
   mtld = ld.mtld(all_tokens)
   return mtld
+
+
+def get_stanza_nlp_models(df: pd.DataFrame, text_col: str, language_col: str, model_type: str) -> dict:
+  # Filter to supported languages
+  if model_type in ['ner']:
+    supported_languages = set({'en', 'es', 'fr', 'de', 'it', 'ru', 'zh'})
+  else:
+    supported_languages = set({'en', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'zh'})
+    
+  df        = df[df[language_col].isin(supported_languages)]
+  languages = df[language_col].unique()
+  use_gpu   = False if not torch.cuda.is_available() else True
   
+  for lang in languages:
+    try:
+      stanza.download(lang)
+      print(f"Downloaded language: {lang}")
+    except FileExistsError:
+      pass
+
+  # Initialize Stanza pipelines
+  stanza_nlp_models = {}
+  for lang in languages:
+      stanza_nlp_models[lang] = stanza.Pipeline(lang=lang, processors=f'tokenize,{model_type}', use_gpu=use_gpu)
+
+  return stanza_nlp_models
+
+
+def get_simplified_pos(text: str, language_code: str, pos_nlp_models: dict) -> list:
+    nlp = pos_nlp_models.get(language_code)
+    if nlp is None:
+        return []
+    doc = nlp(text)
+    simplified_tags = [word.upos for sent in doc.sentences for word in sent.words]
+    return simplified_tags
+
+
+def extract_named_entities(text: str, language_code: str, ner_nlp_models: dict) -> list:
+    nlp = ner_nlp_models.get(language_code)
+    if nlp is None:
+        return []
+    doc = nlp(text)
+    entities = []
+    for sentence in doc.sentences:
+        for ent in sentence.ents:
+            entities.append({
+                'text': ent.text,
+                'type': ent.type
+            })
+    return entities

@@ -12,14 +12,18 @@ from nltk.tokenize import word_tokenize
 from nltk import pos_tag
 from nltk.collocations import BigramCollocationFinder, TrigramCollocationFinder
 from nltk.metrics import BigramAssocMeasures, TrigramAssocMeasures
+
 try:
     nltk.data.find('punkt/english.pickle')
+    nltk.data.find('punkt_tab/english.pickle')
+    nltk.data.find('stopwords/english.pickle')
 except LookupError:
     nltk.download('punkt')
     nltk.download('punkt_tab')
+    nltk.download('stopwords')
 
 from lexical_diversity import lex_div as ld
-
+from sklearn.feature_extraction.text import TfidfVectorizer
 import torch
 
 from collections import defaultdict
@@ -485,3 +489,43 @@ def extract_named_entities(text: str, language_code: str, ner_nlp_models: dict) 
                 'type': ent.type
             })
     return entities
+
+
+def get_top_tfidf_words(df: pd.DataFrame, tokenized_col: str, classes_col: str, top_n: int = 20):
+    df['processed_text'] = df[tokenized_col].apply(lambda x: ' '.join(x))
+  
+    # Compute overall TF-IDF
+    vectorizer_all = TfidfVectorizer()
+    tfidf_matrix_all = vectorizer_all.fit_transform(df['processed_text'])
+    feature_names_all = vectorizer_all.get_feature_names_out()
+    tfidf_scores_all = tfidf_matrix_all.mean(axis=0).A1
+    tfidf_df_all = pd.DataFrame({'term': feature_names_all, 'score_all': tfidf_scores_all})
+    
+    # Compute TF-IDF per class
+    classes = df[classes_col].unique()
+    classes = np.append(classes, ['all'])
+
+    top_words_per_class = {}
+    
+    for cls in classes:
+        # Compute TF-IDF for the class
+        if cls == 'all':
+          class_texts = df['processed_text']
+        else:
+          class_texts = df[df[classes_col] == cls]['processed_text']
+          
+        vectorizer_cls = TfidfVectorizer(vocabulary=feature_names_all)
+        tfidf_matrix_cls = vectorizer_cls.fit_transform(class_texts)
+        tfidf_scores_cls = tfidf_matrix_cls.mean(axis=0).A1
+        tfidf_df_cls = pd.DataFrame({'term': feature_names_all, 'score': tfidf_scores_cls})
+        
+        # Merge with overall TF-IDF
+        tfidf_merged = tfidf_df_cls.merge(tfidf_df_all, on='term')
+        # Calculate difference
+        tfidf_merged['score_diff'] = tfidf_merged['score'] - tfidf_merged['score_all']
+        # Sort by score difference
+        tfidf_merged = tfidf_merged.sort_values(by='score_diff', ascending=False)
+        # Extract top words
+        top_words = tfidf_merged.head(top_n)
+        top_words_per_class[cls] = top_words
+    return top_words_per_class

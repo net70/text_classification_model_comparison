@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import math
 import seaborn as sns
 import matplotlib
 import matplotlib.pyplot as plt
@@ -447,3 +448,44 @@ def visualize_top_n_ner_entities(df: pd.DataFrame, entities_col: str, classes_co
         count = p.get_width()
         y = p.get_y() + p.get_height() / 2
         ax.text(count + max(entity_text_counts['Count']) * 0.01, y, int(count), va='center')
+
+
+def visualize_top_tfidf_words(tfidf_df, class_label, ax=None):
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(8, 6))
+    
+    # Prepare data
+    data = tfidf_df.sort_values(by='score_diff', ascending=False)
+    
+    # Plot
+    sns.barplot(x='score_diff', y='term', data=data, palette='viridis', ax=ax)
+    ax.set_title(f'Top TF-IDF Words for {class_label.capitalize()}')
+    ax.set_xlabel('TF-IDF Score Difference')
+    ax.set_ylabel('Term')
+    
+    # Add data labels
+    for p in ax.patches:
+        score = p.get_width()
+        y = p.get_y() + p.get_height() / 2
+        ax.text(score + max(data['score_diff']) * 0.01, y, f'{score:.4f}', va='center')
+
+
+def visualize_tfidf_results(top_words_per_class):
+    classes = list(top_words_per_class.keys())
+    num_classes = len(classes)
+    ncols = 2
+    nrows = math.ceil(num_classes / ncols)
+    
+    fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(ncols * 10, nrows * 6))
+    axes = axes.flatten()
+    
+    for idx, cls in enumerate(classes):
+        ax = axes[idx]
+        visualize_top_tfidf_words(top_words_per_class[cls], cls, ax=ax)
+    
+    # Hide any unused subplots
+    for idx in range(len(classes), len(axes)):
+        fig.delaxes(axes[idx])
+    
+    plt.tight_layout()
+    plt.show()

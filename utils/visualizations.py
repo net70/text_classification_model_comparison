@@ -15,6 +15,9 @@ import nltk
 from nltk import ngrams
 
 from sklearn.manifold import TSNE
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+
 import torch
 
 from collections import Counter
@@ -489,3 +492,80 @@ def visualize_tfidf_results(top_words_per_class):
     
     plt.tight_layout()
     plt.show()
+
+def plot_sentiment_distribution(df: pd.DataFrame, classes_col: str, sentiment_col: str, max_cols: int = 2, bins: int = 20, figsize: tuple = (12, 4), palette: str = 'husl'):
+    # Get unique classes and determine the grid size
+    classes = df[classes_col].unique()
+    classes = np.append(classes, ['all'])
+    num_classes = len(classes)
+    num_cols = min(max_cols, num_classes)
+    num_rows = (num_classes + num_cols - 1) // num_cols  # Ceiling division
+
+    # Create a color palette
+    colors = sns.color_palette(palette, num_classes)
+
+    # Create subplots
+    fig, axes = plt.subplots(num_rows, num_cols, figsize=figsize, constrained_layout=True)
+    axes = np.array(axes).reshape(-1)  # Flatten the axes array
+
+    # Plot histograms for each class
+    for idx, (cls, color) in enumerate(zip(classes, colors)):
+        data = df if cls == 'all' else df[df[classes_col] == cls]
+        ax = axes[idx]
+        sns.histplot(
+            data=data,
+            x=sentiment_col,
+            bins=bins,
+            kde=False,
+            color=color,
+            ax=ax
+        )
+      
+        ax.set_title(f'Class: {cls}')
+        ax.set_xlabel('Sentiment Score')
+        ax.set_ylabel('Frequency')
+        ax.set_xlim(-1, 1)  # Assuming sentiment scores are between -1 and 1
+
+    # Remove any unused subplots
+    for idx in range(len(classes), len(axes)):
+        fig.delaxes(axes[idx])
+
+    plt.show()
+
+
+def plot_pca_class_distribution(df: pd.DataFrame, classes_col: str, n_components: int = 2):
+    # Dynamically select all columns except the target class column
+    features = [col for col in df.columns if col != classes_col]
+    
+    # Standardize the features
+    X = df[features]
+    X_scaled = StandardScaler().fit_transform(X)
+    
+    # Perform PCA to reduce to n_components dimensions
+    pca = PCA(n_components=n_components)
+    principal_components = pca.fit_transform(X_scaled)
+    
+    # Create a DataFrame with the PCA components and the target class
+    pca_columns = ['PC' + str(i+1) for i in range(n_components)]
+    pca_df = pd.DataFrame(data=principal_components, columns=pca_columns)
+    pca_df[classes_col] = df[classes_col].values
+    
+    # Plotting
+    if n_components == 2:
+        fig = px.scatter(
+            pca_df, x='PC1', y='PC2', color=classes_col,
+            labels={'PC1': 'Principal Component 1', 'PC2': 'Principal Component 2'},
+            title='2D PCA of Term Scores Distribution'
+        )
+        fig.show()
+    
+    elif n_components == 3:
+        fig = px.scatter_3d(
+            pca_df, x='PC1', y='PC2', z='PC3', color=classes_col,
+            labels={'PC1': 'Principal Component 1', 'PC2': 'Principal Component 2', 'PC3': 'Principal Component 3'},
+            title='3D PCA of Term Scores Distribution'
+        )
+        fig.show()
+
+    else:
+        raise ValueError("n_components must be either 2 or 3")

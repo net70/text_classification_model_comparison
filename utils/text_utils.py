@@ -12,19 +12,14 @@ from nltk.tokenize import word_tokenize
 from nltk import pos_tag
 from nltk.collocations import BigramCollocationFinder, TrigramCollocationFinder
 from nltk.metrics import BigramAssocMeasures, TrigramAssocMeasures
-
-try:
-    nltk.data.find('punkt/english.pickle')
-    nltk.data.find('punkt_tab/english.pickle')
-    nltk.data.find('stopwords/english.pickle')
-except LookupError:
-    nltk.download('punkt')
-    nltk.download('punkt_tab')
-    nltk.download('stopwords')
+nltk.download('punkt', quiet=True)
+nltk.download('punkt_tab', quiet=True)
+nltk.download('stopwords', quiet=True)
 
 from lexical_diversity import lex_div as ld
 from sklearn.feature_extraction.text import TfidfVectorizer
 import torch
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 from collections import defaultdict
 from collections import Counter as pCounter
@@ -528,4 +523,60 @@ def get_top_tfidf_words(df: pd.DataFrame, tokenized_col: str, classes_col: str, 
         # Extract top words
         top_words = tfidf_merged.head(top_n)
         top_words_per_class[cls] = top_words
+      
     return top_words_per_class
+
+def compute_avg_score(tokens: list, term_score_dict: dict) -> float:
+    if not tokens or not isinstance(tokens, list):
+        return np.nan  # Return NaN if tokens list is empty or invalid
+    scores = [term_score_dict[token] for token in tokens if token in term_score_dict]
+    if scores:
+        return np.mean(scores)
+    else:
+        return np.nan
+
+
+def sentiment_score_from_probs(probs):
+    negative_prob = probs[0]
+    neutral_prob = probs[1]
+    positive_prob = probs[2]
+    sentiment_score = (-1 * negative_prob) + (0 * neutral_prob) + (1 * positive_prob)
+    return sentiment_score
+
+
+def get_sentiment_scores_batch(texts: list, model_name: str, device: torch.device, batch_size: int = 16):
+    results = []
+    total_texts = len(texts)
+  
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model     = AutoModelForSequenceClassification.from_pretrained(model_name)
+
+    model.to(device)
+    model.eval()
+
+    for i in range(0, total_texts, batch_size):
+        batch_texts = texts[i:i+batch_size]
+        # Preprocess texts
+        batch_texts = [text.strip() if isinstance(text, str) else '' for text in batch_texts]
+        # Tokenize and encode
+        encoded_input = tokenizer(batch_texts, return_tensors='pt', padding=True, truncation=True, max_length=512)
+        # Move inputs to GPU
+        encoded_input = {k: v.to(device) for k, v in encoded_input.items()}
+        # Get model outputs
+        with torch.no_grad():
+            outputs = model(**encoded_input)
+        # Get logits and compute probabilities
+        logits = outputs.logits
+        probs = torch.softmax(logits, dim=-1)
+        probs = probs.detach().cpu().numpy()
+        # Compute sentiment scores and polarities
+        for prob in probs:
+            sentiment_score = sentiment_score_from_probs(prob)
+            if sentiment_score < -0.33:
+                polarity = 'negative'
+            elif sentiment_score > 0.33:
+                polarity = 'positive'
+            else:
+                polarity = 'neutral'
+            results.append({'sentiment_score': sentiment_score, 'polarity': polarity})
+    return results

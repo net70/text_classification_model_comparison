@@ -493,7 +493,7 @@ def visualize_tfidf_results(top_words_per_class):
     plt.tight_layout()
     plt.show()
 
-def plot_sentiment_distribution(df: pd.DataFrame, classes_col: str, sentiment_col: str, max_cols: int = 2, bins: int = 20, figsize: tuple = (12, 4), palette: str = 'husl'):
+def plot_sentiment_distribution_hist(df: pd.DataFrame, classes_col: str, sentiment_col: str, max_cols: int = 2, bins: int = 20, figsize: tuple = (12, 4), palette: str = 'husl'):
     # Get unique classes and determine the grid size
     classes = df[classes_col].unique()
     classes = np.append(classes, ['all'])
@@ -532,6 +532,57 @@ def plot_sentiment_distribution(df: pd.DataFrame, classes_col: str, sentiment_co
 
     plt.show()
 
+
+def plot_category_distribution_by_class_barchart(df: pd.DataFrame, classes_col: str, categories_col: str, max_cols: int = 2, figsize: tuple = (12, 4), palette: str = 'husl'):
+    # Get unique classes and determine the grid size
+    classes = df[classes_col].unique()
+    classes = np.append(classes, ['all'])  # Add 'all' to plot the overall distribution
+    num_classes = len(classes)
+    num_cols = min(max_cols, num_classes)
+    num_rows = (num_classes + num_cols - 1) // num_cols  # Ceiling division
+
+    # Create a color palette (or default if not provided)
+    colors = sns.color_palette("husl", num_classes)
+
+    # Get the unique category order from the entire dataset
+    category_order = df[categories_col].unique()
+
+    # Create subplots
+    fig, axes = plt.subplots(num_rows, num_cols, figsize=figsize)
+    
+    # If only one subplot, make sure axes is a list to iterate over
+    if num_classes == 1:
+        axes = [axes]
+    else:
+        axes = np.array(axes).flatten()  # Flatten the axes array to iterate easily
+
+    # Plot histograms for each class
+    for idx, (cls, color) in enumerate(zip(classes, colors)):
+        data = df if cls == 'all' else df[df[classes_col] == cls]
+        ax = axes[idx]
+        
+        sns.countplot(
+            data=data,
+            x=categories_col,
+            ax=ax,
+            color=color,
+            order=category_order  # Set consistent category order
+        )
+      
+        ax.set_title(f'Class: {cls}')
+        ax.set_xlabel('Categories')
+        ax.set_ylabel('Frequency')
+        
+        # Rotate x-axis labels for readability
+        ax.tick_params(axis='x', rotation=45)
+
+    # Remove any unused subplots
+    for idx in range(len(classes), len(axes)):
+        fig.delaxes(axes[idx])
+
+    # Adjust spacing between subplots
+    plt.tight_layout()
+    plt.show()
 
 def plot_pca_class_distribution(df: pd.DataFrame, classes_col: str, n_components: int = 2):
     # Dynamically select all columns except the target class column

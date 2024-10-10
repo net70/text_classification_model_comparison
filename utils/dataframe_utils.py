@@ -16,6 +16,43 @@ def read_pandas_csv_clean_columns_names(csv_file_path: str) -> pd.DataFrame:
     return df
     
 
+def extract_nested_str_lst_features(df: pd.DataFrame, str_lst_col: str, prefix: str) -> pd.DataFrame:
+    # Get all unique values
+    values = df[str_lst_col].explode().unique()
+    df[str_lst_col] = df[str_lst_col].apply(lambda x: set(x))
+
+    # Create features for each pos type
+    for value in values:
+       df[f'{prefix}_{value}'] = df[str_lst_col].apply(lambda x: 1 if value in x else 0)
+    df = df.drop(str_lst_col, axis=1)
+
+    return df
+
+
+def extract_named_entities_to_columns(df: pd.DataFrame, ner_col: str) -> pd.DataFrame:
+    # Get all unique entity types
+    entity_types = set(ent['type'] for sublist in df[ner_col] for ent in sublist)
+    
+    # Create features for each entity type
+    for entity_type in entity_types:
+        df[f'entity_{entity_type}'] = df[ner_col].apply(
+            lambda ents: sum(1 for ent in ents if ent['type'] == entity_type)
+        )
+    df = df.drop(ner_col, axis=1)
+
+    return df
+    
+
+def embeddings_to_columns(df: pd.DataFrame, embedding_col: str) -> pd.DataFrame:
+    embeddings_df = pd.DataFrame(df[embedding_col].tolist())
+    embeddings_df.columns = [f'{embedding_col}_{i}' for i in range(embeddings_df.shape[1])]
+    
+    df = pd.concat([df, embeddings_df], axis=1)
+    df.drop(embedding_col, axis=1, inplace=True)
+    
+    return df
+
+
 def get_model_cross_validation(modef_df: pd.DataFrame, target_col: str, prediction_col: str) -> dict:
 # Extract the actual and predicted labels
     y_true = modef_df[target_col]
@@ -35,5 +72,4 @@ def get_model_cross_validation(modef_df: pd.DataFrame, target_col: str, predicti
         'recall_weighted':    recall_score(y_true, y_pred, average='weighted')
     }
     
-    # Return the results dictionary
     return results

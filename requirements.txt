@@ -1,3 +1,4 @@
+python-dotenv==1.0.1
 pandas
 numpy
 nltk
@@ -5,6 +6,9 @@ langdetect
 stopwordsiso
 gensim
 scikit-learn
+mlxtend==0.23.1
+imbalanced-learn==0.12.4 
+imblearn
 scipy
 matplotlib
 seaborn

@@ -45,12 +45,14 @@ def extract_named_entities_to_columns(df: pd.DataFrame, ner_col: str) -> pd.Data
 
 def embeddings_to_columns(df: pd.DataFrame, embedding_col: str) -> pd.DataFrame:
     embeddings_df = pd.DataFrame(df[embedding_col].tolist())
-    embeddings_df.columns = [f'{embedding_col}_{i}' for i in range(embeddings_df.shape[1])]
+    #embeddings_df.columns = [f'{embedding_col}_{i}' for i in range(embeddings_df.shape[1])]
+    embeddings_df.columns = [f'col_embedding_{i+1}' for i in embeddings_df.columns]
+
+    df_expanded = pd.concat([df.drop(embedding_col, axis=1).reset_index(drop=True), embeddings_df], axis=1)
+    # df = pd.concat([df, embeddings_df], axis=1)
+    # df.drop(embedding_col, axis=1, inplace=True)
     
-    df = pd.concat([df, embeddings_df], axis=1)
-    df.drop(embedding_col, axis=1, inplace=True)
-    
-    return df
+    return df_expanded
 
 
 def remove_outliers(df: pd.DataFrame, columns: list, rows_to_keep_col: str = None):

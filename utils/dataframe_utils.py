@@ -53,6 +53,26 @@ def embeddings_to_columns(df: pd.DataFrame, embedding_col: str) -> pd.DataFrame:
     return df
 
 
+def remove_outliers(df: pd.DataFrame, columns: list, rows_to_keep_col: str = None):
+  initial_shape = df.shape[0]
+  for column in columns:
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+
+    if rows_to_keep_col:
+        df = df[((df[column] >= lower_bound) & (df[column] <= upper_bound)) | (df[rows_to_keep_col]==True)]    
+    else:
+        df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    print(f"Removing outliers in {column}: {initial_shape - df.shape[0]} rows removed.")
+    initial_shape = df.shape[0]
+
+    return df
+
+
 def get_model_cross_validation(modef_df: pd.DataFrame, target_col: str, prediction_col: str) -> dict:
 # Extract the actual and predicted labels
     y_true = modef_df[target_col]

@@ -1,4 +1,5 @@
 import pandas as pd
+from pandas.plotting import scatter_matrix
 import numpy as np
 import math
 import seaborn as sns
@@ -620,3 +621,108 @@ def plot_pca_class_distribution(df: pd.DataFrame, classes_col: str, n_components
 
     else:
         raise ValueError("n_components must be either 2 or 3")
+
+
+def plot_distributions(df: pd.DataFrame, target_col: str, exclude_cols: list = []):
+    cols_to_plot = [col for col in df.columns if col not in exclude_cols]
+    
+    n_cols = 3
+    n_rows = int(np.ceil(len(cols_to_plot) / n_cols))
+
+    # Create subplots
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(19, 5 * n_rows))
+    axes = axes.flatten()
+
+    for i, col in enumerate(cols_to_plot):
+        ax = axes[i]
+        # Plot target col
+        if col == target_col:
+            value_counts = df[col].value_counts()
+            ax.bar(value_counts.index, value_counts.values)
+            ax.set_title(f'Distribution of {target_col}')
+            ax.set_xlabel(col)
+            ax.set_ylabel('Count')
+
+        # Plot int64 data as bar chart if unique values <= 10
+        elif df[col].dtype == 'int64' and df[col].nunique() <= 10:
+            value_counts = df.groupby(col)[target_col].value_counts().unstack()
+            value_counts.plot(kind='bar', ax=ax)
+            ax.set_title(f'Distribution of {col} by {target_col}')
+            ax.set_xlabel(col)
+            ax.set_ylabel('Count')
+            ax.set_xticklabels(ax.get_xticklabels(), rotation=45)
+
+        # Plot float or other numeric data as histogram
+        elif pd.api.types.is_numeric_dtype(df[col]):
+            for label in df[target_col].unique():
+                df[df[target_col] == label][col].plot(kind='hist', alpha=0.8, ax=ax, label=label)
+            ax.set_title(f'Distribution of {col} by {target_col}')
+            ax.set_xlabel(col)
+            ax.set_ylabel('Count')
+
+        # Plot categorical data            
+        elif isinstance(df[col].dtype, pd.CategoricalDtype) or df[col].dtype == 'object':
+            df.groupby(col)[target_col].value_counts(normalize=False).unstack().plot(kind='bar', stacked=False, ax=ax)
+            ax.set_title(f'Distribution of {col} by {target_col}')
+            ax.set_xlabel(col)
+            ax.set_ylabel('Count')
+            ax.set_xticklabels(ax.get_xticklabels(), rotation=45)
+
+    # Remove any unused subplots
+    for j in range(i + 1, len(axes)):
+        fig.delaxes(axes[j])
+
+    plt.tight_layout()
+    plt.legend(title=target_col)
+    plt.show()
+
+
+def scatter_plot_matrix(df: pd.DataFrame, num_features: list):
+    scatter_matrix_plot = scatter_matrix(df[num_features], alpha=0.8, figsize=(40, 40), diagonal='kde')
+    
+    for ax in scatter_matrix_plot.ravel():
+        ax.set_xlabel(ax.get_xlabel(), fontsize=12, rotation=45)
+        ax.set_ylabel(ax.get_ylabel(), fontsize=12, rotation=0)
+    
+    plt.tight_layout()
+    plt.show()
+
+
+def correlation_heatmap_plot(df: pd.DataFrame, num_features: list, fig_size: tuple = (12, 8)):
+    # Calculate correlation matrix
+    corr = df[num_features].corr()
+
+    plt.figure(figsize=fig_size)
+    mask = np.triu(np.ones_like(corr, dtype=bool))
+    
+    # Create heatmap
+    sns.heatmap(corr, annot=True, cmap='coolwarm', mask=mask)
+    plt.show()
+
+
+
+def plot_boxplots(df: pd.DataFrame, num_features: list, max_charts_per_line: int = 4, **kwargs):
+    max_charts_per_line = max_charts_per_line
+    num_features = list(num_features)
+    
+    # Calculate number of rows and columns needed
+    n_cols = min(max_charts_per_line, len(num_features))
+    n_rows = math.ceil(len(num_features) / max_charts_per_line)
+    
+    figsize = kwargs.get('figsize', (5 * n_cols, 6 * n_rows))
+    title = kwargs.get('title', 'Boxplots of Numeric Features')
+    
+    fig, axes = plt.subplots(nrows=n_rows, ncols=n_cols, figsize=figsize)
+    axes = axes.flatten() if n_rows > 1 else axes
+
+    for i, feature in enumerate(num_features):
+        df.boxplot(column=feature, ax=axes[i])
+        axes[i].set_title(f'Boxplot of {feature}')
+
+    # Remove any unused subplots
+    for j in range(i + 1, len(axes)):
+        fig.delaxes(axes[j])
+
+    fig.suptitle(title)
+    plt.tight_layout()
+    plt.show()

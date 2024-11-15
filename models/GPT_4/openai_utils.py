@@ -5,6 +5,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 import pandas as pd
 import numpy as np
 
+from sklearn.model_selection import train_test_split
+
 import tiktoken
 import openai
 from openai.types import Batch
@@ -112,7 +114,7 @@ def map_jsonl_batch_completion_results_to_df(df: pd.DataFrame, file_name: str, t
 
 ########################## Fine Tuning Util Functions ##########################
 
-def generate_openai_fine_tuning_json_from_df(fine_tuning_file_name: str, df: pd.DataFrame, system_prompt: str, user_promt_col: str, target_col: str, samples_per_class: int, random_state: int):
+def generate_openai_fine_tuning_json_from_df(fine_tuning_file_name: str, df: pd.DataFrame, system_prompt: str, user_prompt_col: str, target_col: str, samples_per_class: int, random_state: int):
     
     def set_row_to_fine_tuning_format(system_prompt: str, user_prompt: str, classification: str) -> dict:    
         return {
@@ -125,12 +127,23 @@ def generate_openai_fine_tuning_json_from_df(fine_tuning_file_name: str, df: pd.
 
     
     # Randomly extract sample per target class for a balanced training set
-    df_fine_tuning = df[[user_promt_col, target_col]].groupby(target_col).sample(n=samples_per_class, random_state=random_state)
+    sample_ratio = samples_per_class/df.shape[0]
+    ft_samples, _ = train_test_split(df, train_size=sample_ratio, stratify=df[target_col], random_state=random_state)
+    ft_samples['ft'] = True
 
+    df_fine_tuning = df.merge(ft_samples[['ft']], left_index=True, right_index=True, how='left')
+    df_fine_tuning['ft'] = df_fine_tuning['ft'].fillna(False)
+    df_fine_tuning = df_fine_tuning[df_fine_tuning['ft'] == True]
+
+    print('fine tuning file distribution')
+    print(df_fine_tuning[target_col].value_counts())
+  
+    df_fine_tuning = df_fine_tuning[[user_prompt_col, target_col]]
+  
     # Generate the JSONL file
     with open(f'{fine_tuning_file_name}.jsonl', 'w') as f:
         for index, record in df_fine_tuning.iterrows():
-            row = set_row_to_fine_tuning_format(system_prompt, record[user_promt_col], record[target_col])
+            row = set_row_to_fine_tuning_format(system_prompt, record[user_prompt_col], record[target_col])
             f.write(json.dumps(row) + '\n')
 
 def upload_fine_tuning_file_to_openai(file_path: str) -> str:

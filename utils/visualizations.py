@@ -213,7 +213,7 @@ def generate_token_cloud_by_class(df: pd.DataFrame, tokens_column: str, classes_
     target_col = classes_col
 
     classes   = df[classes_col].unique()
-    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+    fig, axes = plt.subplots(1, len(classes), figsize=(15, 5))
 
     # Generate word clouds for each text and plot them
     for i, cls in enumerate(classes):
@@ -380,7 +380,7 @@ def visualize_cooccurrence(cooccurrence_matrix, top_n=50, ax=None, title='', bac
 def visualize_pos_frequencies(df: pd.DataFrame, pos_col: str, calsses_col: str, class_label: str = None, ax=None):
     if class_label:
         df_filtered = df[df[calsses_col] == class_label]
-        title = f'POS Tag Frequency in {class_label.capitalize()} Inquiries'
+        title = f'POS Tag Frequency in {class_label.capitalize()} Class'
     else:
         df_filtered = df
         title = 'Overall POS Tag Frequency'
@@ -410,7 +410,7 @@ def visualize_pos_frequencies(df: pd.DataFrame, pos_col: str, calsses_col: str, 
 def visualize_top_n_ner_entities(df: pd.DataFrame, entities_col: str, classes_col: str, class_label: str = None, top_n: int = 10, ax=None):
     if class_label:
         entities_list = df[df[classes_col] == class_label][entities_col]
-        title = f'Top {top_n} Entities in {class_label} Inquiries'
+        title = f'Top {top_n} Entities in {class_label} Class'
     else:
         entities_list = df[entities_col]
         title = f'Top {top_n} Entities'
@@ -700,7 +700,6 @@ def correlation_heatmap_plot(df: pd.DataFrame, num_features: list, fig_size: tup
     plt.show()
 
 
-
 def plot_boxplots(df: pd.DataFrame, num_features: list, max_charts_per_line: int = 4, **kwargs):
     max_charts_per_line = max_charts_per_line
     num_features = list(num_features)
@@ -726,3 +725,48 @@ def plot_boxplots(df: pd.DataFrame, num_features: list, max_charts_per_line: int
     fig.suptitle(title)
     plt.tight_layout()
     plt.show()
+
+
+# Map the model feature back to the original features (pre encoding)
+def plot_feature_importance(model: str):
+    feature_importance_dict = {feature: [] for feature in model_cols}
+    
+    for org_feature in feature_importance_dict:
+      for feature in model_results_df.loc[model]['feature_importance']:
+        if org_feature in feature[0]:
+          feature_importance_dict[org_feature].append(feature[1])
+    
+    feature_importance_dict = {feature: np.sum(val) for feature, val in feature_importance_dict.items()}
+    
+    # Convert the list of tuples to a DataFrame
+    df_top_features = pd.DataFrame(list(feature_importance_dict.items()), columns=['Feature', 'Importance']).sort_values(by="Importance", ascending=False)
+    
+    # Plot using matplotlib
+    plt.figure(figsize=(10, 6))
+    plt.barh(df_top_features['Feature'], df_top_features['Importance'], color='skyblue')
+    plt.xlabel('Importance')
+    plt.ylabel('Feature')
+    plt.title('Feature Importance')
+    plt.gca().invert_yaxis()
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_roc_auc(roc_auc: dict):
+  n_classes = len(roc_auc)
+
+  plt.figure(figsize=(8, 6))
+  for class_label in roc_auc:
+      fpr = roc_auc[class_label]['fpr']
+      tpr = roc_auc[class_label]['tpr']
+      auc_score = roc_auc[class_label]['auc']
+      plt.plot(fpr, tpr, label=f'ROC curve of class {class_label} (AUC = {auc_score:.2f})')
+  
+  plt.plot([0, 1], [0, 1], 'k--')
+  plt.xlim([0.0, 1.0])
+  plt.ylim([0.0, 1.05])
+  plt.xlabel('False Positive Rate')
+  plt.ylabel('True Positive Rate')
+  plt.title('ROC Curves for Multi-Class SVM')
+  plt.legend(loc="lower right")
+  plt.show()

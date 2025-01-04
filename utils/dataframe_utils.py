@@ -11,7 +11,6 @@ import re
 
 def read_pandas_csv_clean_columns_names(csv_file_path: str) -> pd.DataFrame:
     def clean_column_name(col: str) -> str:
-        # Check if the column name is already in snake_case using regex, else clean it
         return col if re.match(r'^[a-z0-9_]+$', col) else re.sub(r'\s+', '_', re.sub(r'[^a-zA-Z0-9\s]', '', col.strip())).lower()
 
     df = pd.read_csv(csv_file_path)
@@ -20,11 +19,9 @@ def read_pandas_csv_clean_columns_names(csv_file_path: str) -> pd.DataFrame:
     
 
 def extract_nested_str_lst_features(df: pd.DataFrame, str_lst_col: str, prefix: str) -> pd.DataFrame:
-    # Get all unique values
     values = df[str_lst_col].explode().unique()
     df[str_lst_col] = df[str_lst_col].apply(lambda x: set(x))
 
-    # Create features for each pos type
     for value in values:
        df[f'{prefix}_{value}'] = df[str_lst_col].apply(lambda x: 1 if value in x else 0)
     df = df.drop(str_lst_col, axis=1)
@@ -33,10 +30,8 @@ def extract_nested_str_lst_features(df: pd.DataFrame, str_lst_col: str, prefix: 
 
 
 def extract_named_entities_to_columns(df: pd.DataFrame, ner_col: str) -> pd.DataFrame:
-    # Get all unique entity types
     entity_types = set(ent['type'] for sublist in df[ner_col] for ent in sublist)
     
-    # Create features for each entity type
     for entity_type in entity_types:
         df[f'entity_{entity_type}'] = df[ner_col].apply(
             lambda ents: sum(1 for ent in ents if ent['type'] == entity_type)
@@ -76,34 +71,29 @@ def embeddings_to_columns(df: pd.DataFrame, embedding_col: str) -> pd.DataFrame:
 
 
 def get_balanced_dataset(original_df: pd.DataFrame, classes_col: str, synthetic_col='is_synthetic', random_state=12345) -> pd.DataFrame:
-    # Separate the features and target variable
     X = original_df.drop(classes_col, axis=1)
     y = original_df[classes_col]
 
     majority_class = original_df[classes_col].value_counts().nlargest(1).index[0]
     majority_class_count = original_df[classes_col].value_counts().nlargest(1)[1]
 
-    #TODO: Make this dynamic
     desired_samples = {
-        2: majority_class_count,  # Increase class 2 to match class 1
-        0: majority_class_count   # Increase class 0 to match class 1
+        2: majority_class_count,
+        0: majority_class_count
     }
     
     # Apply SMOTE to generate synthetic samples
     smote = SMOTE(sampling_strategy=desired_samples, random_state=random_state)
     X_resampled, y_resampled = smote.fit_resample(X, y)
     
-    # Create a new DataFrame with the synthetic samples
     synthetic_samples_df = pd.DataFrame(X_resampled, columns=X.columns)
     synthetic_samples_df[synthetic_col] = True
     synthetic_samples_df[classes_col] = y_resampled
     
-    # Assign new indexes to the synthetic samples DataFrame
     max_index = original_df.index.max()
     synthetic_samples_df.index = range(max_index + 1, max_index + 1 + len(synthetic_samples_df))
   
     original_df[synthetic_col] = False
-    # Concatenate the original DataFrame with the synthetic samples DataFrame
     balanced_df = pd.concat([original_df.reset_index(drop=True), synthetic_samples_df])
     
     return balanced_df
@@ -170,11 +160,8 @@ def get_train_test_sets(df: pd.DataFrame, target_col: str, test_ratio=0.2, rando
 
 
 def get_model_cross_validation(model_df: pd.DataFrame, target_col: str, prediction_col: str) -> dict:
-# Extract the actual and predicted labels
-    y_true = model_df[target_col]
-    y_pred = model_df[prediction_col]
-    
-    # Calculate metrics
+    y_true  = model_df[target_col]
+    y_pred  = model_df[prediction_col]
     results = {
         'accuracy':           accuracy_score(y_true, y_pred),
         'f1_macro':           f1_score(y_true, y_pred, average='macro'),

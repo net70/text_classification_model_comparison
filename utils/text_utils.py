@@ -253,87 +253,61 @@ supported_languages = langs()
 def remove_pii(text: str) -> str:
     original_input = text
     try:
-        # Regular expression pattern for phone numbers
         phone_pattern = r"\b(\+?\d[-.\s()]*\d{3}[-.\s()]*(?:\d{2,}[-.\s()]*)?\d{2,})\b"
-    
-        # Regular expression pattern for email addresses
         email_pattern = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"
-    
-        # Regular expression pattern for addresses
         address_pattern = r"\b\d+\s+([A-Za-z]+\s*){1,4}(Street|St|Rd|Road|Avenue|Ave|Boulevard|Blvd|Lane|Ln|Drive|Dr|Court|Ct|Place|Pl|Square|Sq)\b"
-    
-        # Function to replace phone numbers with "<someones_phone_number>"
+      
         def replace_phone(match):
             return "<someones_phone_number>"
     
-        # Function to replace email addresses with the appropriate dummy values
         def replace_email(match):
             email = match.group()
-            if email.endswith("lusha.com"):
-                return "rep@lusha.com"
+            if email.endswith("saascompany.com"):
+                return "rep@saascompany.com"
             else:
                 return "prospect@somemail.com"
-    
-        # Function to replace addresses with "<some_address>"
+
         def replace_address(match):
             return "<some_address>"
         
-        # Function to remove url patterns (i.e <https://blah-blah.com/blah-blah>)
         def remove_urls(text):
-            # Remove URLs starting with "http://" or "https://"
             text = re.sub(r"http[s]?://\S+", "<some_url>", text)
-    
-            # Remove URLs enclosed in angle brackets <>
             text = re.sub(r"<[^>]+>", "<some_url>", text)
-    
-            # Remove additional URL pattern
             text = re.sub(r"\.s\.hubspotemail\.net/[^ ]+", "<some_url>", text)
             return text
         
         def remove_addresses(text):
-            # Define the address patterns
             patterns = [
                 r'\b\d+\b\s+\w+\b\s+\w+\b',                               # Numeric Street Address
                 r'\b\d+\w*\b[-/]?\s*\b\d+\w*\b\s+\w+\b\s+\w+\b',          # Street Address with Unit/Apartment Number
                 r'(P\.O\. Box|PO Box)\s+\d+',                             # P.O. Box Address
                 r'\b\w+\b\s*,?\s*\b\w{2}\b\s+\d{5}(-\d{4})?',             # City, State, and ZIP/Postal Code
             ]
-    
-            # Remove address patterns from the text
+
             for pattern in patterns:
                 text = re.sub(pattern, '<some_address>', text)
     
             return text
     
-        # Replace phone numbers with "<someones_phone_number>"
         text = re.sub(phone_pattern, replace_phone, text)
-    
-        # Replace email addresses with dummy values
         text = re.sub(email_pattern, replace_email, text)
-    
-        # Replace addresses with "<some_address>"
         text = re.sub(address_pattern, replace_address, text)
-        
         text = remove_urls(text)
-        
         text = remove_addresses(text)
-    
         res = text
+      
     except Exception as e:
         print(f"Error:{str(e)}|\t text: {original_input}")
         res = original_input
     finally:
         return res
 
-
-# Function to detect language and add as a new column
 def detect_language(text):
     try:
         return detect(text)
     except:
         return 'xxx'
 
-# Function to preprocess text with language-specific stopwords
 def tokenize_text(text, lang):
     tokens = nltk.word_tokenize(text.lower())
     tokens = [word for word in tokens if word.isalpha()]
@@ -342,7 +316,6 @@ def tokenize_text(text, lang):
         stop_words = set(stopwords(lang))
         tokens = [word for word in tokens if word not in stop_words]
     return tokens
-
 
 def find_n_collocations(df: pd.DataFrame, tokens_col: str, n: int =20, min_frequency: int = 3):
     all_tokens = [token for tokens in df[tokens_col] for token in tokens]
@@ -356,7 +329,6 @@ def find_n_collocations(df: pd.DataFrame, tokens_col: str, n: int =20, min_frequ
     for i, bigram in enumerate(bigram_collocations):
         print(f"{i+1}.{' '.join(bigram)}")
 
-    # Trigram Collocation Finder
     trigram_measures = TrigramAssocMeasures()
     finder = TrigramCollocationFinder.from_words(all_tokens)
     finder.apply_freq_filter(min_frequency)
@@ -387,16 +359,10 @@ def extract_topics(df, text_column, num_topics=10, passes=5, tokens_already_proc
     else:
         text_data = df[text_column]
 
-    # Create a dictionary representation of the documents
     dictionary = corpora.Dictionary(text_data)
-
-    # Filter out extremes to remove very common and very rare words
     dictionary.filter_extremes(no_below=5, no_above=0.5)
-
-    # Create a Bag-of-Words representation of the documents
+  
     corpus = [dictionary.doc2bow(text) for text in text_data]
-
-    # Train the LDA model
     lda_model = gensim.models.LdaModel(corpus=corpus,
                                        id2word=dictionary,
                                        num_topics=num_topics,
@@ -412,11 +378,8 @@ def assign_dominant_topic(lda_model, corpus):
     topic_percentages = []
     
     for doc_bow in corpus:
-        # Get the topic distribution for the document
         topic_probs = lda_model.get_document_topics(doc_bow, minimum_probability=0.0)
-        # Sort the topics by probability
         sorted_topic_probs = sorted(topic_probs, key=lambda x: x[1], reverse=True)
-        # Get the dominant topic and its percentage
         dominant_topic, dominant_prob = sorted_topic_probs[0]
         dominant_topics.append(dominant_topic)
         topic_percentages.append(dominant_prob)
@@ -437,7 +400,6 @@ def get_mtld(all_tokens: list):
 
 
 def get_stanza_nlp_models(df: pd.DataFrame, text_col: str, language_col: str, model_type: str) -> dict:
-  # Filter to supported languages
   if model_type in ['ner']:
     supported_languages = set({'en', 'es', 'fr', 'de', 'it', 'ru', 'zh'})
   else:
@@ -453,8 +415,7 @@ def get_stanza_nlp_models(df: pd.DataFrame, text_col: str, language_col: str, mo
       print(f"Downloaded language: {lang}")
     except FileExistsError:
       pass
-
-  # Initialize Stanza pipelines
+      
   stanza_nlp_models = {}
   for lang in languages:
       stanza_nlp_models[lang] = stanza.Pipeline(lang=lang, processors=f'tokenize,{model_type}', use_gpu=use_gpu)
@@ -503,7 +464,6 @@ def get_top_tfidf_words(df: pd.DataFrame, tokenized_col: str, classes_col: str, 
     top_words_per_class = {}
     
     for cls in classes:
-        # Compute TF-IDF for the class
         if cls == 'all':
           class_texts = df['processed_text']
         else:
@@ -514,13 +474,9 @@ def get_top_tfidf_words(df: pd.DataFrame, tokenized_col: str, classes_col: str, 
         tfidf_scores_cls = tfidf_matrix_cls.mean(axis=0).A1
         tfidf_df_cls = pd.DataFrame({'term': feature_names_all, 'score': tfidf_scores_cls})
         
-        # Merge with overall TF-IDF
         tfidf_merged = tfidf_df_cls.merge(tfidf_df_all, on='term')
-        # Calculate difference
         tfidf_merged['score_diff'] = tfidf_merged['score'] - tfidf_merged['score_all']
-        # Sort by score difference
         tfidf_merged = tfidf_merged.sort_values(by='score_diff', ascending=False)
-        # Extract top words
         top_words = tfidf_merged.head(top_n)
         top_words_per_class[cls] = top_words
       
@@ -528,7 +484,7 @@ def get_top_tfidf_words(df: pd.DataFrame, tokenized_col: str, classes_col: str, 
 
 def compute_avg_score(tokens: list, term_score_dict: dict) -> float:
     if not tokens or not isinstance(tokens, list):
-        return np.nan  # Return NaN if tokens list is empty or invalid
+        return np.nan
     scores = [term_score_dict[token] for token in tokens if token in term_score_dict]
     if scores:
         return np.mean(scores)
@@ -556,20 +512,17 @@ def get_sentiment_scores_batch(texts: list, model_name: str, device: torch.devic
 
     for i in range(0, total_texts, batch_size):
         batch_texts = texts[i:i+batch_size]
-        # Preprocess texts
         batch_texts = [text.strip() if isinstance(text, str) else '' for text in batch_texts]
-        # Tokenize and encode
         encoded_input = tokenizer(batch_texts, return_tensors='pt', padding=True, truncation=True, max_length=512)
-        # Move inputs to GPU
         encoded_input = {k: v.to(device) for k, v in encoded_input.items()}
-        # Get model outputs
+
+      
         with torch.no_grad():
             outputs = model(**encoded_input)
-        # Get logits and compute probabilities
         logits = outputs.logits
         probs = torch.softmax(logits, dim=-1)
         probs = probs.detach().cpu().numpy()
-        # Compute sentiment scores and polarities
+
         for prob in probs:
             sentiment_score = sentiment_score_from_probs(prob)
             if sentiment_score < -0.33:

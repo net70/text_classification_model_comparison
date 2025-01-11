@@ -581,6 +581,7 @@ def plot_category_distribution_by_class_barchart(df: pd.DataFrame, classes_col: 
     plt.tight_layout()
     plt.show()
 
+
 def plot_pca_class_distribution(df: pd.DataFrame, classes_col: str, n_components: int = 2):
     features = [col for col in df.columns if col != classes_col]
 

@@ -14,7 +14,7 @@ if torch.cuda.is_available():
 
 
 from collections import Counter
-
+import time
 
 class LSTM(nn.Module):
     def __init__(self, num_classes: int, embedding_dim: int, num_features: int, l1_reg=0.0, l2_reg=0.0):
@@ -113,7 +113,7 @@ def preprocess_data(df, embedding_columns, feature_columns, target_column, test_
         random_state=random_state, stratify=y_train
     )
 
-    # Convert the data to PyTorch tensors
+    # Convert the data to tensors
     train_embeddings = torch.tensor(X_train_embeddings.values, dtype=torch.float32)
     train_features = torch.tensor(X_train_features.values, dtype=torch.float32)
     train_labels = torch.tensor(y_train.values, dtype=torch.long)
@@ -126,7 +126,7 @@ def preprocess_data(df, embedding_columns, feature_columns, target_column, test_
     test_features = torch.tensor(X_test_features.values, dtype=torch.float32)
     test_labels = torch.tensor(y_test.values, dtype=torch.long)
 
-    # Create PyTorch datasets
+    # Create datasets
     train_dataset = TensorDataset(train_embeddings, train_features, train_labels)
     val_dataset = TensorDataset(val_embeddings, val_features, val_labels)
     test_dataset = TensorDataset(test_embeddings, test_features, test_labels)
@@ -147,6 +147,10 @@ def train_model(model, train_dataloader, val_dataloader, criterion, optimizer, d
     best_val_loss = float('inf')
     counter = 0
 
+    if device.type == 'cuda':
+        torch.cuda.reset_peak_memory_stats(device)  
+
+    start_time = time.time()
     for epoch in range(num_epochs):
         try:
             model.train()
@@ -217,7 +221,16 @@ def train_model(model, train_dataloader, val_dataloader, criterion, optimizer, d
         except Exception as e:
             raise e
 
-    # Plot the training and validation metrics
+  
+    end_time = time.time()
+    total_time = end_time - start_time
+    print(f"Total training time: {total_time:.2f} seconds")
+
+    if device.type == 'cuda':
+        peak_memory = torch.cuda.max_memory_allocated(device)
+        peak_memory_mb = peak_memory / (1024 ** 2)
+        print(f"Peak GPU VRAM usage: {peak_memory_mb:.2f} MB")
+
     plt.figure(figsize=(12, 4))
     plt.subplot(1, 2, 1)
     plt.plot(train_losses, label='Train Loss')
@@ -238,7 +251,6 @@ def train_model(model, train_dataloader, val_dataloader, criterion, optimizer, d
 
 
 def test_model(model, test_dataloader, device):
-    # Evaluate the model on the test set
     model.eval()
     test_preds = []
     test_labels = []
@@ -278,7 +290,6 @@ def test_model(model, test_dataloader, device):
         fpr[i], tpr[i], _ = roc_curve(test_labels, test_preds_prob[:, i], pos_label=i)
         roc_auc[i] = auc(fpr[i], tpr[i])
     
-    # Plot ROC curve for each class
     plt.figure(figsize=(8, 6))
     for i in range(num_classes):
         plt.plot(fpr[i], tpr[i], label=f"Class {i} (AUC = {roc_auc[i]:.2f})")
@@ -292,37 +303,17 @@ def test_model(model, test_dataloader, device):
     plt.show()
 
 
-def add_predictions_to_dataframe(df, model, device, embedding_columns, feature_columns, prediction_column_name='prediction', batch_size=64):
-    """
-    Adds predictions to the DataFrame using the provided model.
-
-    Parameters:
-    - df: pandas DataFrame containing the features.
-    - model: Trained PyTorch model.
-    - device: torch.device object ('cpu' or 'cuda').
-    - embedding_columns: List of column names for embeddings.
-    - feature_columns: List of column names for additional features.
-    - prediction_column_name: Name of the column to store predictions.
-    - batch_size: Batch size for DataLoader.
-
-    Returns:
-    - df: DataFrame with a new column containing the predictions.
-    """
-  
+def add_predictions_to_dataframe(df, model, device, embedding_columns, feature_columns, prediction_column_name='prediction', batch_size=64): 
     model.eval()
     model.to(device)
 
     # Extract embeddings and features from the DataFrame
-    embeddings_np = df[embedding_columns].values  # Shape: (num_records, 1024)
-    features_np   = df[feature_columns].values      # Shape: (num_records, 82)
+    embeddings_np = df[embedding_columns].values
+    features_np   = df[feature_columns].values
 
-    # Convert to PyTorch tensors
+    # Convert to tensors
     embeddings_tensor = torch.tensor(embeddings_np, dtype=torch.float32)
     features_tensor   = torch.tensor(features_np, dtype=torch.float32)
-
-    # Do NOT reshape tensors; keep them as 2D tensors
-    # embeddings_tensor shape: (num_records, 1024)
-    # features_tensor shape: (num_records, 82)
 
     # Create a TensorDataset and DataLoader
     dataset    = TensorDataset(embeddings_tensor, features_tensor)
@@ -332,22 +323,17 @@ def add_predictions_to_dataframe(df, model, device, embedding_columns, feature_c
 
     with torch.no_grad():
         for batch in dataloader:
-            batch_embeddings = batch[0].to(device)  # Shape: (batch_size, 1024)
-            batch_features = batch[1].to(device)    # Shape: (batch_size, 82)
+            batch_embeddings = batch[0].to(device)
+            batch_features = batch[1].to(device)
 
-            # Pass the data through the model
             outputs = model(batch_embeddings, batch_features)
 
-            # Apply softmax if the model outputs logits
             probabilities = torch.softmax(outputs, dim=1)
 
-            # Get the predicted class (assuming classification task)
             _, predicted_classes = torch.max(probabilities, dim=1)
 
-            # Collect predictions
             predictions.extend(predicted_classes.cpu().numpy())
 
-    # Add predictions to the DataFrame
     df[prediction_column_name] = predictions
 
     return df

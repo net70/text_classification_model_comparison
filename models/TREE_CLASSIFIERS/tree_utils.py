@@ -299,42 +299,6 @@ def run_tree_ensamble_on_dataset(df: pd.DataFrame, clf, target_col: str, clf_par
               'f1_score': float(f1_scores[optimal_index])
           }
       }  
-  # class_names = [str(cls) for cls in classes]
-  
-  # if len(class_names) > 2:
-  #     y_pred_proba = clf.predict_proba(X_test)
-  #     roc_auc = {}
-  #     optimal_thresholds_and_F1scores = {}
-  #     for i, class_label in enumerate(classes):
-  #         y_test_binary = (y_test == class_label).astype(int)
-  #         fpr, tpr, thresholds = roc_curve(y_test_binary, y_pred_proba[:, i])
-  #         auc_score = auc(fpr, tpr)
-  #         roc_auc[str(class_label)] = {'fpr': fpr, 'tpr': tpr, 'auc': auc_score}
-
-  #         f1_scores = []
-  #         for threshold in thresholds:
-  #             y_pred_binary = (y_pred_proba[:, i] >= threshold).astype(int)
-  #             f1_scores.append(f1_score(y_test_binary, y_pred_binary))
-  #         optimal_index = np.argmax(f1_scores)
-  #         optimal_thresholds_and_F1scores[str(class_label)] = {
-  #             'threshold': thresholds[optimal_index],
-  #             'f1_score': f1_scores[optimal_index]
-  #         }
-  # else:
-  #     y_pred_proba = clf.predict_proba(X_test)[:, 1]
-  #     fpr, tpr, thresholds = roc_curve(y_test, y_pred_proba)
-  #     auc_score = auc(fpr, tpr)
-  #     roc_auc = {class_names[0]: {'fpr': fpr, 'tpr': tpr, 'auc': auc_score}}
-
-  #     f1_scores = []
-  #     for threshold in thresholds:
-  #         y_pred_binary = (y_pred_proba >= threshold).astype(int)
-  #         f1_scores.append(f1_score(y_test, y_pred_binary)) 
-  #     optimal_index = np.argmax(f1_scores)
-  #     optimal_thresholds_and_F1_scores = {
-  #         'threshold': thresholds[optimal_index],
-  #         'f1_score': f1_scores[optimal_index]
-  #     }
 
   res = {
       "num_rows_trained": len(X_train),

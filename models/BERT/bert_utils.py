@@ -24,10 +24,7 @@ def get_latest_checkpoint(output_dir):
     if not checkpoints:
         return None  # No checkpoints found
 
-    # Sort the checkpoints based on their step numbers (numerical sorting)
     checkpoints = sorted(checkpoints, key=lambda x: int(x.split('-')[-1]))
-
-    # Get the latest checkpoint directory
     latest_checkpoint = checkpoints[-1]
     return os.path.join(output_dir, latest_checkpoint)
 
@@ -56,7 +53,6 @@ def compute_metrics(pred):
 
 
 def balance_and_augment_text_data(df, text_col, target_col, model_path='bert-base-multilingual-cased'):
-    # Print class distribution before augmentation
     print("Class distribution before augmentation:")
     print(df[target_col].value_counts())
 
@@ -105,16 +101,13 @@ def balance_and_augment_text_data(df, text_col, target_col, model_path='bert-bas
                     print(f"Augmentation error for text '{original_text}': {e}")
                     continue
 
-    # Create a DataFrame for the augmented data
     augmented_df = pd.DataFrame({
         text_col: augmented_texts,
         target_col: augmented_labels
     })
 
-    # Combine original and augmented data
     df_augmented = pd.concat([df, augmented_df], ignore_index=True)
 
-    # Print class distribution after augmentation
     print("\nClass distribution after augmentation:")
     print(df_augmented[target_col].value_counts())
 
@@ -131,11 +124,9 @@ def preprocess_data(data, text_col, target_col, tokenizer, max_length=512):
 
 
 def fine_tune_bert(data, text_col, target_col, random_seed=12345, num_labels=2, l2_reg=0.01, num_epochs=30, es_patience=10, resume_checkpoint=None, model_path='final_model', output_dir='results'):
-    # Split data into train, validation, and test sets
     train_data, test_data = train_test_split(data, test_size=0.2, random_state=random_seed)
     train_data, val_data = train_test_split(train_data, test_size=0.2, random_state=random_seed)
 
-    # Load pre-trained tokenizer and model
     model_name = "bert-base-multilingual-cased"
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=num_labels)
@@ -145,23 +136,21 @@ def fine_tune_bert(data, text_col, target_col, random_seed=12345, num_labels=2, 
     val_dataset   = preprocess_data(val_data,   text_col, target_col, tokenizer)
     test_dataset  = preprocess_data(test_data,  text_col, target_col, tokenizer)
 
-    # Set training arguments
     training_args = TrainingArguments(
         output_dir=f"./{output_dir}",
-        evaluation_strategy="epoch",  # Evaluate after each epoch
-        save_strategy="epoch",        # Save model after each epoch
+        evaluation_strategy="epoch", 
+        save_strategy="epoch",        
         learning_rate=2e-5,
-        per_device_train_batch_size=16,  # Reduced batch size due to larger model
+        per_device_train_batch_size=16,
         per_device_eval_batch_size=16,
         num_train_epochs=num_epochs,
         weight_decay=l2_reg,
         seed=random_seed,
-        load_best_model_at_end=True,  # Load the best model at the end based on the evaluation metric
-        metric_for_best_model="eval_loss",  # Specify the metric for choosing the best model
-        save_total_limit=2,  # Limit the total amount of checkpoints
+        load_best_model_at_end=True,
+        metric_for_best_model="eval_loss",
+        save_total_limit=2,
     )
 
-    # Create Trainer instance
     trainer = Trainer(
         model=model,
         args=training_args,
@@ -171,10 +160,8 @@ def fine_tune_bert(data, text_col, target_col, random_seed=12345, num_labels=2, 
         callbacks=[EarlyStoppingCallback(early_stopping_patience=es_patience)]
     )
 
-    # Fine-tune the model
     trainer.train(resume_from_checkpoint=resume_checkpoint)
 
-    # Evaluate on test set
     predictions = trainer.predict(test_dataset)
     print(predictions.metrics)
 
@@ -186,21 +173,16 @@ def fine_tune_bert(data, text_col, target_col, random_seed=12345, num_labels=2, 
 
 
 def predict_with_model_batched(df, text_column, model_path, batch_size=32, max_length=512):
-    # Load the fine-tuned model and tokenizer
     model = AutoModelForSequenceClassification.from_pretrained(model_path)
     tokenizer = AutoTokenizer.from_pretrained(model_path)
     
-    # Move the model to GPU
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
     
-    # Set the model to evaluation mode
     model.eval()
     
-    # Initialize an empty list to store the predictions
     all_predictions = []
     
-    # Iterate over the DataFrame in batches
     for i in tqdm(range(0, len(df), batch_size)):
         batch_df = df[i:i+batch_size]
         
@@ -211,7 +193,6 @@ def predict_with_model_batched(df, text_column, model_path, batch_size=32, max_l
         input_ids = batch_encodings["input_ids"].to(device)
         attention_mask = batch_encodings["attention_mask"].to(device)
         
-        # Make predictions on the batch
         with torch.no_grad():
             outputs = model(input_ids=input_ids, attention_mask=attention_mask)
             logits = outputs.logits
@@ -224,12 +205,10 @@ def predict_with_model_batched(df, text_column, model_path, batch_size=32, max_l
     return all_predictions
 
 def plot_train_val_loss(df: pd.DataFrame):
-  # Extract the necessary columns for plotting
   epochs = df['Epoch']
   train_loss = df['Training Loss']
   val_loss = df['Validation Loss']
   
-  # Plot train and validation loss over epochs
   plt.figure(figsize=(8, 5))
   plt.plot(epochs, train_loss, label='Training Loss', marker='o')
   plt.plot(epochs, val_loss, label='Validation Loss', marker='o')

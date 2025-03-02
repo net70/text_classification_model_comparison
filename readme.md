@@ -1,5 +1,5 @@
 # Text Classification Model Comparisons
-This repository showcases the research of "Bigger Isn't Always Better: A Benchmark of Language Models vs. Embedding Methods for Text Classification".
+This repository showcases the research of "Optimizing Text Classification: How Small Models and Embeddings Challenge the Giants".
 
 ## Code Owners
 [Nathaniel Maymon](nathanjm91@gmail.com)

@@ -53,13 +53,17 @@ Finally, all models were compared against one another.
 <b>Bottom Line</b>: 
 * If you have a very general use case that requires a large knowledge base, use an LLM\SLM for text classification. 
 * However, if you have a custom use case, using an SLM\PLM based embedding approach with traditinal ML\DL models will give you the best "bang for your buck" by far. 
-* Finally, While using a model like Distill-RoBERTa is easiset on input, fine-tuning, and inference while on average providing the best accuracy.
+* Using a model like Distill-RoBERTa is easiset on input, fine-tuning, and inference while on average providing the best accuracy.
+* While a model can display high accuracy and F1 rates, it's imparative to test it against domain specific metrics!
+
 
 ## Repo overview
 repo layout explanation
 
 * `utils`: Files containing utility functions for various operations throughout the notebooks.
 * `datasets`: Contains the base datasets (as described below), and is where all the intermediate datasets from the notebooks are saved.
+    * `preprocessed`: Is meant for storing the preprocessed datasets.
+    * `checkpoint_data`: Dump any intermediate data throughout the process.
 * `models`: Main directory containing a subdirectories for each model's notebooks and model-specific utils files. Go there to view the model runs specifically.
 
 ## Datasets
